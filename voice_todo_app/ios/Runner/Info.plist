@@ -22,15 +22,10 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
-
-	<!-- Microphone permission (required for voice recognition) -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>VoiceTodo needs access to your microphone to recognize voice commands for managing your tasks.</string>
-
-	<!-- Speech recognition permission -->
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>VoiceTodo uses speech recognition to convert your voice into task commands. This requires sending audio data to Apple's speech recognition servers.</string>
-
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

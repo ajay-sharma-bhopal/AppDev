@@ -16,7 +16,7 @@ A Flutter-based cross-platform TODO app for **Android and iOS** that listens to 
 ## Voice Commands
 
 | Command | Example |
-|---------|---------|
+|---------|----------|
 | Add task | `"Add buy groceries"` / `"Agregar comprar leche"` |
 | Complete task | `"Complete buy groceries"` / `"Done with meeting"` |
 | Delete task | `"Delete the meeting"` / `"Eliminar tarea"` |

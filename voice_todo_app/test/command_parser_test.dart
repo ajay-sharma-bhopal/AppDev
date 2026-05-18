@@ -95,7 +95,6 @@ void main() {
 
     test('handles empty task title gracefully', () {
       final result = parser.parse('add');
-      // Should either be unknown or add with empty/null title
       if (result.type == CommandType.addTask) {
         expect(result.taskTitle == null || result.taskTitle!.isEmpty || result.taskTitle == 'Add', true);
       }
