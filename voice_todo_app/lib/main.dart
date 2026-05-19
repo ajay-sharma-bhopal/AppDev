@@ -1,12 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'config/supabase_config.dart';
 import 'providers/todo_provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/auth_screen.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -26,25 +31,60 @@ class VoiceTodoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => TodoProvider()..initialize(),
+      create: (_) => TodoProvider(),
       child: MaterialApp(
         title: 'VoiceTodo',
         theme: AppTheme.darkTheme(),
         debugShowCheckedModeBanner: false,
-        home: const SplashGate(),
+        home: const AuthGate(),
       ),
     );
   }
 }
 
-/// Shows a loading splash until the provider is initialized
-class SplashGate extends StatelessWidget {
-  const SplashGate({super.key});
+/// Listens to Supabase auth state and routes between AuthScreen / HomeScreen.
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  late final StreamSubscription<AuthState> _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSub = supabase.auth.onAuthStateChange.listen((data) {
+      final provider = context.read<TodoProvider>();
+      if (data.session != null) {
+        provider.initialize();
+      } else {
+        provider.reset();
+      }
+    });
+    // Bootstrap if already signed in from a previous session
+    if (supabase.auth.currentSession != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<TodoProvider>().initialize();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSub.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<TodoProvider>(
       builder: (context, provider, _) {
+        if (supabase.auth.currentSession == null) {
+          return const AuthScreen();
+        }
         if (!provider.isInitialized) {
           return const _SplashScreen();
         }
@@ -95,7 +135,7 @@ class _SplashScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Speak your tasks into existence',
+              'Loading your tasks…',
               style: TextStyle(color: Colors.white38, fontSize: 14),
             ),
             const SizedBox(height: 40),

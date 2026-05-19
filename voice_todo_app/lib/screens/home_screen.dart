@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../config/supabase_config.dart';
 import '../providers/todo_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/voice_panel.dart';
@@ -144,6 +145,19 @@ class HomeScreen extends StatelessWidget {
               onTap: () {
                 Navigator.pop(context);
                 _showVoiceHelp(context);
+              },
+            ),
+            const Divider(color: Colors.white12),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.white54),
+              title: const Text('Sign out', style: TextStyle(color: Colors.white70)),
+              subtitle: Text(
+                supabase.auth.currentUser?.email ?? '',
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                context.read<TodoProvider>().signOut();
               },
             ),
             const SizedBox(height: 8),

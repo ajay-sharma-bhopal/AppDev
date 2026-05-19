@@ -42,6 +42,35 @@ class TodoItem {
     );
   }
 
+  // Supabase row → TodoItem (snake_case columns)
+  factory TodoItem.fromSupabase(Map<String, dynamic> row) => TodoItem(
+        id: row['id'] as String,
+        title: row['title'] as String,
+        description: row['description'] as String?,
+        isCompleted: row['is_completed'] as bool? ?? false,
+        priority: Priority.values.firstWhere(
+          (p) => p.name == row['priority'],
+          orElse: () => Priority.medium,
+        ),
+        createdAt: DateTime.parse(row['created_at'] as String),
+        completedAt: row['completed_at'] != null
+            ? DateTime.parse(row['completed_at'] as String)
+            : null,
+        detectedLanguage: row['detected_language'] as String?,
+      );
+
+  // TodoItem → Supabase INSERT payload (user_id is added by RLS / server)
+  Map<String, dynamic> toSupabaseInsert() => {
+        'title': title,
+        'description': description,
+        'is_completed': isCompleted,
+        'priority': priority.name,
+        'created_at': createdAt.toUtc().toIso8601String(),
+        'completed_at': completedAt?.toUtc().toIso8601String(),
+        'detected_language': detectedLanguage,
+      };
+
+  // Legacy local JSON (kept for any existing cached data)
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
@@ -54,20 +83,18 @@ class TodoItem {
       };
 
   factory TodoItem.fromJson(Map<String, dynamic> json) => TodoItem(
-        id: json['id'],
-        title: json['title'],
-        description: json['description'],
-        isCompleted: json['isCompleted'] ?? false,
-        priority: Priority.values[json['priority'] ?? 1],
-        createdAt: DateTime.parse(json['createdAt']),
+        id: json['id'] as String,
+        title: json['title'] as String,
+        description: json['description'] as String?,
+        isCompleted: json['isCompleted'] as bool? ?? false,
+        priority: Priority.values[json['priority'] as int? ?? 1],
+        createdAt: DateTime.parse(json['createdAt'] as String),
         completedAt: json['completedAt'] != null
-            ? DateTime.parse(json['completedAt'])
+            ? DateTime.parse(json['completedAt'] as String)
             : null,
-        detectedLanguage: json['detectedLanguage'],
+        detectedLanguage: json['detectedLanguage'] as String?,
       );
 
   String toJsonString() => jsonEncode(toJson());
-
-  factory TodoItem.fromJsonString(String jsonString) =>
-      TodoItem.fromJson(jsonDecode(jsonString));
+  factory TodoItem.fromJsonString(String s) => TodoItem.fromJson(jsonDecode(s));
 }
