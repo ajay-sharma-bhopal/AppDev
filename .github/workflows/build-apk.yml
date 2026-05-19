@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build VoiceTodo (APK + Web)
 
 on:
   push:
@@ -84,3 +84,36 @@ jobs:
           echo "=== APK path ==="
           echo "Debug:   build/app/outputs/flutter-apk/app-debug.apk"
           echo "Release: build/app/outputs/flutter-apk/app-release.apk"
+
+  build-web:
+    name: Build Web App
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        working-directory: voice_todo_app
+        run: flutter pub get
+
+      - name: Build Web
+        working-directory: voice_todo_app
+        run: |
+          flutter build web --release \
+            --build-name=1.0.0 \
+            --build-number=${{ github.run_number }}
+
+      - name: Upload Web Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiceTodo-web-${{ github.run_number }}
+          path: voice_todo_app/build/web/
+          retention-days: 30
