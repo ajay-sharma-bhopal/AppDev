@@ -4,6 +4,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'geolocation_service.dart';
 
 enum VoiceStatus {
   uninitialized,
@@ -14,19 +15,33 @@ enum VoiceStatus {
   unavailable,
 }
 
+// Known STT variants for the wake word "Tippidi"
+const _wakeWordVariants = [
+  'tippidi',
+  'tipidi',
+  'tippidee',
+  'tipidee',
+  'tipped',
+  'teppidi',
+  'titipidi',
+  'tippe di',
+  'tipi di',
+];
+
 class VoiceService extends ChangeNotifier {
   final SpeechToText _stt = SpeechToText();
   final FlutterTts _tts = FlutterTts();
+  final GeoService _geo = GeoService();
 
   VoiceStatus _status = VoiceStatus.uninitialized;
   String _lastWords = '';
   String _currentWords = '';
   String _errorMessage = '';
   bool _isAlwaysListening = false;
+  bool _requireWakeWord = true;
   List<LocaleName> _availableLocales = [];
   LocaleName? _selectedLocale;
 
-  // Callback invoked when a final recognized phrase is ready
   Function(String)? onCommandReceived;
 
   VoiceStatus get status => _status;
@@ -35,6 +50,7 @@ class VoiceService extends ChangeNotifier {
   String get errorMessage => _errorMessage;
   bool get isListening => _status == VoiceStatus.listening;
   bool get isAlwaysListening => _isAlwaysListening;
+  bool get requireWakeWord => _requireWakeWord;
   List<LocaleName> get availableLocales => _availableLocales;
   LocaleName? get selectedLocale => _selectedLocale;
   bool get isAvailable => _status != VoiceStatus.unavailable;
@@ -49,9 +65,8 @@ class VoiceService extends ChangeNotifier {
 
       if (available) {
         _availableLocales = await _stt.locales();
-        _selectedLocale = _availableLocales.isNotEmpty
-            ? _availableLocales.first
-            : null;
+        // Try to detect locale via IP geolocation first
+        await _applyGeoLocale();
         _status = VoiceStatus.ready;
       } else {
         _status = VoiceStatus.unavailable;
@@ -68,17 +83,33 @@ class VoiceService extends ChangeNotifier {
     }
   }
 
+  Future<void> _applyGeoLocale() async {
+    if (_availableLocales.isEmpty) return;
+    final localeId = await _geo.detectLocale();
+    if (localeId == null) {
+      _selectedLocale = _availableLocales.first;
+      return;
+    }
+    // Find exact match or best prefix match (e.g. 'hi-IN' → 'hi_IN')
+    final normalized = localeId.replaceAll('-', '_').toLowerCase();
+    final match = _availableLocales.where((l) {
+      return l.localeId.toLowerCase() == normalized ||
+          l.localeId.toLowerCase().startsWith(normalized.split('_').first);
+    }).firstOrNull;
+    _selectedLocale = match ?? _availableLocales.first;
+  }
+
   Future<void> _initTts() async {
-    await _tts.setLanguage('en-US');
+    await _tts.setLanguage(
+        _selectedLocale?.localeId.replaceAll('_', '-') ?? 'en-US');
     await _tts.setSpeechRate(0.5);
     await _tts.setVolume(1.0);
     await _tts.setPitch(1.0);
   }
 
   Future<void> startListening() async {
-    if (_status == VoiceStatus.unavailable || _status == VoiceStatus.uninitialized) {
-      return;
-    }
+    if (_status == VoiceStatus.unavailable ||
+        _status == VoiceStatus.uninitialized) return;
     if (_stt.isListening) return;
 
     _currentWords = '';
@@ -123,12 +154,21 @@ class VoiceService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setRequireWakeWord(bool value) {
+    _requireWakeWord = value;
+    notifyListeners();
+  }
+
   Future<void> speak(String text) async {
     await _tts.speak(text);
   }
 
   Future<void> speakTaskAdded(String taskTitle) async {
     await speak('Task added: $taskTitle');
+  }
+
+  Future<void> speakPendingAdd(String taskTitle) async {
+    await speak('Confirm: $taskTitle in 5 seconds');
   }
 
   Future<void> speakTaskCompleted(String taskTitle) async {
@@ -148,13 +188,25 @@ class VoiceService extends ChangeNotifier {
     notifyListeners();
 
     if (result.finalResult && result.recognizedWords.isNotEmpty) {
-      _lastWords = result.recognizedWords;
+      final raw = result.recognizedWords;
+      final stripped = _stripWakeWord(raw.toLowerCase().trim());
+
+      // In always-listening mode, require the wake word prefix
+      if (_isAlwaysListening && _requireWakeWord && stripped == null) {
+        _status = VoiceStatus.ready;
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (_isAlwaysListening) startListening();
+        });
+        return;
+      }
+
+      final command = stripped ?? raw;
+      _lastWords = raw;
       _status = VoiceStatus.processing;
       notifyListeners();
 
-      onCommandReceived?.call(result.recognizedWords);
+      onCommandReceived?.call(command);
 
-      // If always-listening mode, restart after a short delay
       if (_isAlwaysListening) {
         Future.delayed(const Duration(milliseconds: 500), () {
           if (_isAlwaysListening) {
@@ -169,10 +221,21 @@ class VoiceService extends ChangeNotifier {
     }
   }
 
+  /// Returns the transcript with the wake word stripped, or null if no wake
+  /// word was found (meaning the utterance should be ignored in wake-word mode).
+  String? _stripWakeWord(String lower) {
+    for (final variant in _wakeWordVariants) {
+      if (lower.startsWith(variant)) {
+        return lower.substring(variant.length).trim();
+      }
+    }
+    return null;
+  }
+
   void _onSttError(SpeechRecognitionError error) {
-    // Ignore no-speech errors in always-listening mode — just restart
     if (_isAlwaysListening &&
-        (error.errorMsg == 'error_no_match' || error.errorMsg == 'error_speech_timeout')) {
+        (error.errorMsg == 'error_no_match' ||
+            error.errorMsg == 'error_speech_timeout')) {
       Future.delayed(const Duration(milliseconds: 300), () {
         if (_isAlwaysListening) startListening();
       });

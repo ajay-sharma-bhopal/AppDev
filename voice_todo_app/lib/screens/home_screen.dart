@@ -7,6 +7,7 @@ import '../widgets/voice_panel.dart';
 import '../widgets/todo_tile.dart';
 import '../widgets/add_task_sheet.dart';
 import '../widgets/language_picker.dart';
+import '../widgets/pending_add_banner.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -25,7 +26,8 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context, TodoProvider provider) {
+  PreferredSizeWidget _buildAppBar(
+      BuildContext context, TodoProvider provider) {
     return AppBar(
       backgroundColor: AppTheme.darkBg,
       elevation: 0,
@@ -33,7 +35,7 @@ class HomeScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'VoiceTodo',
+            'Tippidi',
             style: TextStyle(
               color: Colors.white,
               fontSize: 26,
@@ -71,6 +73,9 @@ class HomeScreen extends StatelessWidget {
           lastFeedback: provider.lastCommandFeedback,
         ),
 
+        // Pending-add countdown banner
+        const PendingAddBanner(),
+
         // Filter chips
         _FilterBar(provider: provider),
 
@@ -100,8 +105,13 @@ class HomeScreen extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => AddTaskSheet(
-        onAdd: (title, priority) =>
-            provider.addTaskManually(title, priority: priority),
+        onAdd: (title, priority, reminderAt, reminderFrequency) =>
+            provider.addTaskManually(
+          title,
+          priority: priority,
+          reminderAt: reminderAt,
+          reminderFrequency: reminderFrequency,
+        ),
       ),
     );
   }
@@ -128,8 +138,10 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.done_all, color: Colors.white70),
-              title: const Text('Clear completed', style: TextStyle(color: Colors.white)),
+              leading:
+                  const Icon(Icons.done_all, color: Colors.white70),
+              title: const Text('Clear completed',
+                  style: TextStyle(color: Colors.white)),
               subtitle: Text(
                 '${provider.completedCount} completed tasks',
                 style: const TextStyle(color: Colors.white38),
@@ -140,8 +152,10 @@ class HomeScreen extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.info_outline, color: Colors.white70),
-              title: const Text('Voice commands', style: TextStyle(color: Colors.white)),
+              leading: const Icon(Icons.info_outline,
+                  color: Colors.white70),
+              title: const Text('Voice commands',
+                  style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 _showVoiceHelp(context);
@@ -149,11 +163,14 @@ class HomeScreen extends StatelessWidget {
             ),
             const Divider(color: Colors.white12),
             ListTile(
-              leading: const Icon(Icons.logout, color: Colors.white54),
-              title: const Text('Sign out', style: TextStyle(color: Colors.white70)),
+              leading:
+                  const Icon(Icons.logout, color: Colors.white54),
+              title: const Text('Sign out',
+                  style: TextStyle(color: Colors.white70)),
               subtitle: Text(
                 supabase.auth.currentUser?.email ?? '',
-                style: const TextStyle(color: Colors.white38, fontSize: 12),
+                style: const TextStyle(
+                    color: Colors.white38, fontSize: 12),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -172,7 +189,8 @@ class HomeScreen extends StatelessWidget {
       context: context,
       builder: (_) => Dialog(
         backgroundColor: const Color(0xFF1E1E2E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -181,7 +199,10 @@ class HomeScreen extends StatelessWidget {
             children: [
               const Text(
                 'Voice Commands',
-                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               ..._helpItems.map((item) => Padding(
@@ -190,9 +211,11 @@ class HomeScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: AppTheme.primaryColor.withOpacity(0.2),
+                            color:
+                                AppTheme.primaryColor.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -208,7 +231,8 @@ class HomeScreen extends StatelessWidget {
                         Expanded(
                           child: Text(
                             item[1],
-                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 13),
                           ),
                         ),
                       ],
@@ -216,8 +240,11 @@ class HomeScreen extends StatelessWidget {
                   )),
               const SizedBox(height: 8),
               const Text(
-                'Works in English, Spanish, French, Hindi, German, Portuguese, Japanese, Chinese, Arabic, and more!',
-                style: TextStyle(color: Colors.white38, fontSize: 12, fontStyle: FontStyle.italic),
+                'Say "Tippidi" first, then your command in any language!',
+                style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic),
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -225,9 +252,11 @@ class HomeScreen extends StatelessWidget {
                 child: TextButton(
                   onPressed: () => Navigator.pop(context),
                   style: TextButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor.withOpacity(0.15),
+                    backgroundColor:
+                        AppTheme.primaryColor.withOpacity(0.15),
                   ),
-                  child: const Text('Got it', style: TextStyle(color: AppTheme.primaryColor)),
+                  child: const Text('Got it',
+                      style: TextStyle(color: AppTheme.primaryColor)),
                 ),
               ),
             ],
@@ -238,11 +267,11 @@ class HomeScreen extends StatelessWidget {
   }
 
   static const _helpItems = [
-    ['ADD', '"Add buy groceries" / "Create meeting notes" / "New buy milk"'],
-    ['COMPLETE', '"Complete buy groceries" / "Done with meeting"'],
-    ['DELETE', '"Delete buy groceries" / "Remove task"'],
-    ['LIST', '"Show my tasks" / "List tasks"'],
-    ['CLEAR', '"Clear completed tasks"'],
+    ['ADD', '"Tippidi add buy groceries" / "Tippidi new meeting notes"'],
+    ['COMPLETE', '"Tippidi complete buy groceries"'],
+    ['DELETE', '"Tippidi delete buy groceries"'],
+    ['LIST', '"Tippidi show my tasks"'],
+    ['CLEAR', '"Tippidi clear completed tasks"'],
     ['PRIORITY', 'Add "urgent" or "important" for high priority'],
   ];
 }
@@ -285,7 +314,10 @@ class _FilterChip extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _FilterChip({required this.label, required this.isSelected, required this.onTap});
+  const _FilterChip(
+      {required this.label,
+      required this.isSelected,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -293,9 +325,12 @@ class _FilterChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryColor : const Color(0xFF252535),
+          color: isSelected
+              ? AppTheme.primaryColor
+              : const Color(0xFF252535),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -303,7 +338,8 @@ class _FilterChip extends StatelessWidget {
           style: TextStyle(
             color: isSelected ? Colors.white : Colors.white54,
             fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            fontWeight:
+                isSelected ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
       ),
@@ -326,20 +362,23 @@ class _TaskList extends StatelessWidget {
           todo: todo,
           onToggle: () => provider.toggleTask(todo.id),
           onDelete: () => provider.deleteTask(todo.id),
-          onEdit: () => _showEditDialog(context, provider, todo.id, todo.title),
+          onEdit: () =>
+              _showEditDialog(context, provider, todo.id, todo.title),
         );
       },
     );
   }
 
-  void _showEditDialog(BuildContext context, TodoProvider provider, String id, String current) {
+  void _showEditDialog(BuildContext context, TodoProvider provider,
+      String id, String current) {
     final ctrl = TextEditingController(text: current);
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E2E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Edit Task', style: TextStyle(color: Colors.white)),
+        title: const Text('Edit Task',
+            style: TextStyle(color: Colors.white)),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -356,7 +395,8 @@ class _TaskList extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
+            child: const Text('Cancel',
+                style: TextStyle(color: Colors.white38)),
           ),
           TextButton(
             onPressed: () {
@@ -365,7 +405,8 @@ class _TaskList extends StatelessWidget {
               }
               Navigator.pop(context);
             },
-            child: const Text('Save', style: TextStyle(color: AppTheme.primaryColor)),
+            child: const Text('Save',
+                style: TextStyle(color: AppTheme.primaryColor)),
           ),
         ],
       ),
@@ -380,9 +421,18 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, title, subtitle) = switch (filter) {
-      'active' => (Icons.check_circle_outline, 'All done!', 'No active tasks. Great job!'),
-      'completed' => (Icons.hourglass_empty, 'No completed tasks', 'Complete a task to see it here'),
-      _ => (Icons.mic_none, 'No tasks yet', 'Say "Add [task]" or tap + to get started'),
+      'active' =>
+        (Icons.check_circle_outline, 'All done!', 'No active tasks. Great job!'),
+      'completed' => (
+          Icons.hourglass_empty,
+          'No completed tasks',
+          'Complete a task to see it here'
+        ),
+      _ => (
+          Icons.mic_none,
+          'No tasks yet',
+          'Say "Tippidi add [task]" or tap + to get started'
+        ),
     };
 
     return Center(
@@ -391,9 +441,16 @@ class _EmptyState extends StatelessWidget {
         children: [
           Icon(icon, size: 64, color: Colors.white12),
           const SizedBox(height: 16),
-          Text(title, style: const TextStyle(color: Colors.white54, fontSize: 18, fontWeight: FontWeight.w600)),
+          Text(title,
+              style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          Text(subtitle, style: const TextStyle(color: Colors.white24, fontSize: 13), textAlign: TextAlign.center),
+          Text(subtitle,
+              style:
+                  const TextStyle(color: Colors.white24, fontSize: 13),
+              textAlign: TextAlign.center),
         ],
       ),
     );

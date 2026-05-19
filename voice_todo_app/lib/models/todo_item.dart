@@ -2,6 +2,7 @@ import 'dart:convert';
 
 enum Priority { low, medium, high }
 
+// reminder_frequency values: 'none' | 'once' | 'daily' | 'weekly'
 class TodoItem {
   final String id;
   String title;
@@ -11,6 +12,8 @@ class TodoItem {
   DateTime createdAt;
   DateTime? completedAt;
   String? detectedLanguage;
+  DateTime? reminderAt;
+  String reminderFrequency;
 
   TodoItem({
     required this.id,
@@ -21,6 +24,8 @@ class TodoItem {
     required this.createdAt,
     this.completedAt,
     this.detectedLanguage,
+    this.reminderAt,
+    this.reminderFrequency = 'none',
   });
 
   TodoItem copyWith({
@@ -29,6 +34,8 @@ class TodoItem {
     bool? isCompleted,
     Priority? priority,
     DateTime? completedAt,
+    DateTime? reminderAt,
+    String? reminderFrequency,
   }) {
     return TodoItem(
       id: id,
@@ -39,6 +46,8 @@ class TodoItem {
       createdAt: createdAt,
       completedAt: completedAt ?? this.completedAt,
       detectedLanguage: detectedLanguage,
+      reminderAt: reminderAt ?? this.reminderAt,
+      reminderFrequency: reminderFrequency ?? this.reminderFrequency,
     );
   }
 
@@ -57,9 +66,13 @@ class TodoItem {
             ? DateTime.parse(row['completed_at'] as String)
             : null,
         detectedLanguage: row['detected_language'] as String?,
+        reminderAt: row['reminder_at'] != null
+            ? DateTime.parse(row['reminder_at'] as String)
+            : null,
+        reminderFrequency: row['reminder_frequency'] as String? ?? 'none',
       );
 
-  // TodoItem → Supabase INSERT payload (user_id is added by RLS / server)
+  // TodoItem → Supabase INSERT payload
   Map<String, dynamic> toSupabaseInsert() => {
         'title': title,
         'description': description,
@@ -68,9 +81,12 @@ class TodoItem {
         'created_at': createdAt.toUtc().toIso8601String(),
         'completed_at': completedAt?.toUtc().toIso8601String(),
         'detected_language': detectedLanguage,
+        if (reminderAt != null)
+          'reminder_at': reminderAt!.toUtc().toIso8601String(),
+        'reminder_frequency': reminderFrequency,
       };
 
-  // Legacy local JSON (kept for any existing cached data)
+  // Legacy local JSON
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
@@ -80,6 +96,8 @@ class TodoItem {
         'createdAt': createdAt.toIso8601String(),
         'completedAt': completedAt?.toIso8601String(),
         'detectedLanguage': detectedLanguage,
+        'reminderAt': reminderAt?.toIso8601String(),
+        'reminderFrequency': reminderFrequency,
       };
 
   factory TodoItem.fromJson(Map<String, dynamic> json) => TodoItem(
@@ -93,6 +111,10 @@ class TodoItem {
             ? DateTime.parse(json['completedAt'] as String)
             : null,
         detectedLanguage: json['detectedLanguage'] as String?,
+        reminderAt: json['reminderAt'] != null
+            ? DateTime.parse(json['reminderAt'] as String)
+            : null,
+        reminderFrequency: json['reminderFrequency'] as String? ?? 'none',
       );
 
   String toJsonString() => jsonEncode(toJson());

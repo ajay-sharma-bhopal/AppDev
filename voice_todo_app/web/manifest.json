@@ -1,11 +1,11 @@
 {
-    "name": "VoiceTodo",
-    "short_name": "VoiceTodo",
+    "name": "Tippidi",
+    "short_name": "Tippidi",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#121212",
     "theme_color": "#6C63FF",
-    "description": "Voice-enabled TODO app with multi-language support",
+    "description": "Voice-enabled task manager — just say Tippidi to add tasks",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -13,9 +13,18 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 //     priority      text default 'medium' not null,
 //     created_at    timestamptz default now() not null,
 //     completed_at  timestamptz,
-//     detected_language text
+//     detected_language text,
+//     reminder_at       timestamptz,
+//     reminder_frequency text not null default 'none'
+//       check (reminder_frequency in ('none', 'once', '30min', '1hr', '3hr', 'daily', 'weekly'))
 //   );
 //   alter table public.todos enable row level security;
+//
+// If upgrading an existing todos table, run:
+//   alter table public.todos
+//     add column if not exists reminder_at timestamptz,
+//     add column if not exists reminder_frequency text not null default 'none'
+//       check (reminder_frequency in ('none', 'once', '30min', '1hr', '3hr', 'daily', 'weekly'));
 //   create policy "Users manage own todos"
 //     on public.todos for all
 //     using  (auth.uid() = user_id)

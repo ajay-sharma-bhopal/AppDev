@@ -7,11 +7,23 @@ import 'config/supabase_config.dart';
 import 'providers/todo_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/auth_screen.dart';
+import 'services/reminder_service.dart';
 import 'theme/app_theme.dart';
+
+// Conditional import: web gets no-op stubs, native gets real foreground service.
+import 'services/foreground_service_stub.dart'
+    if (dart.library.io) 'services/foreground_task_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await ReminderService().initialize();
+
+  initForegroundCommunicationPort();
+  initForegroundTask();
+
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -22,18 +34,18 @@ void main() async {
       statusBarIconBrightness: Brightness.light,
     ),
   );
-  runApp(const VoiceTodoApp());
+  runApp(const TippidiApp());
 }
 
-class VoiceTodoApp extends StatelessWidget {
-  const VoiceTodoApp({super.key});
+class TippidiApp extends StatelessWidget {
+  const TippidiApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => TodoProvider(),
       child: MaterialApp(
-        title: 'VoiceTodo',
+        title: 'Tippidi',
         theme: AppTheme.darkTheme(),
         debugShowCheckedModeBanner: false,
         home: const AuthGate(),
@@ -50,12 +62,13 @@ class AuthGate extends StatefulWidget {
   State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> {
+class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   late final StreamSubscription<AuthState> _authSub;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _authSub = supabase.auth.onAuthStateChange.listen((data) {
       final provider = context.read<TodoProvider>();
       if (data.session != null) {
@@ -64,7 +77,6 @@ class _AuthGateState extends State<AuthGate> {
         provider.reset();
       }
     });
-    // Bootstrap if already signed in from a previous session
     if (supabase.auth.currentSession != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<TodoProvider>().initialize();
@@ -73,7 +85,21 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final provider = context.read<TodoProvider>();
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      if (provider.voiceService.isAlwaysListening) {
+        startForegroundListening();
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      stopForegroundListening();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authSub.cancel();
     super.dispose();
   }
@@ -125,7 +151,7 @@ class _SplashScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             const Text(
-              'VoiceTodo',
+              'Tippidi',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 32,

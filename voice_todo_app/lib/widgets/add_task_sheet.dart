@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/todo_item.dart';
 import '../theme/app_theme.dart';
+import 'reminder_picker.dart';
 
 class AddTaskSheet extends StatefulWidget {
-  final Function(String title, Priority priority) onAdd;
+  final Function(String title, Priority priority, DateTime? reminderAt,
+      String reminderFrequency) onAdd;
 
   const AddTaskSheet({super.key, required this.onAdd});
 
@@ -15,11 +17,14 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   final _controller = TextEditingController();
   Priority _priority = Priority.medium;
   final _focusNode = FocusNode();
+  String _reminderFrequency = 'none';
+  DateTime? _reminderAt;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _focusNode.requestFocus());
   }
 
   @override
@@ -29,10 +34,20 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     super.dispose();
   }
 
+  Future<void> _pickReminder() async {
+    final result = await showReminderPicker(context);
+    if (result != null) {
+      setState(() {
+        _reminderFrequency = result.frequency;
+        _reminderAt = reminderAtForFrequency(result.frequency);
+      });
+    }
+  }
+
   void _submit() {
     final title = _controller.text.trim();
     if (title.isEmpty) return;
-    widget.onAdd(title, _priority);
+    widget.onAdd(title, _priority, _reminderAt, _reminderFrequency);
     Navigator.of(context).pop();
   }
 
@@ -89,9 +104,11 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                borderSide:
+                    const BorderSide(color: AppTheme.primaryColor, width: 2),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _submit(),
@@ -101,7 +118,10 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
           const SizedBox(height: 16),
           const Text(
             'Priority',
-            style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w600),
+            style: TextStyle(
+                color: Colors.white54,
+                fontSize: 13,
+                fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Row(
@@ -116,7 +136,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     margin: const EdgeInsets.only(right: 8),
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      color: isSelected ? color.withOpacity(0.2) : const Color(0xFF252535),
+                      color: isSelected
+                          ? color.withOpacity(0.2)
+                          : const Color(0xFF252535),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isSelected ? color : Colors.white12,
@@ -129,7 +151,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                       style: TextStyle(
                         color: isSelected ? color : Colors.white38,
                         fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -137,6 +161,53 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               );
             }).toList(),
           ),
+          const SizedBox(height: 16),
+
+          // Reminder row
+          GestureDetector(
+            onTap: _pickReminder,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF252535),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _reminderFrequency != 'none'
+                      ? AppTheme.primaryColor.withOpacity(0.5)
+                      : Colors.white12,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _reminderFrequency != 'none'
+                        ? Icons.notifications_active_outlined
+                        : Icons.notifications_off_outlined,
+                    color: _reminderFrequency != 'none'
+                        ? AppTheme.primaryColor
+                        : Colors.white38,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _reminderLabel(),
+                      style: TextStyle(
+                        color: _reminderFrequency != 'none'
+                            ? Colors.white
+                            : Colors.white38,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right,
+                      color: Colors.white24, size: 18),
+                ],
+              ),
+            ),
+          ),
+
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
@@ -146,7 +217,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                 backgroundColor: AppTheme.primaryColor,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
                 elevation: 0,
               ),
               child: const Text(
@@ -158,5 +230,17 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         ],
       ),
     );
+  }
+
+  String _reminderLabel() {
+    return switch (_reminderFrequency) {
+      'none' => 'No reminder',
+      '30min' => 'Remind in 30 minutes',
+      '1hr' => 'Remind in 1 hour',
+      '3hr' => 'Remind in 3 hours',
+      'daily' => 'Remind daily',
+      'weekly' => 'Remind weekly',
+      _ => 'No reminder',
+    };
   }
 }

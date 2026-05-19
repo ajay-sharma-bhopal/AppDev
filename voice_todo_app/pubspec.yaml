@@ -33,6 +33,21 @@ dependencies:
   cupertino_icons: ^1.0.6
   flutter_svg: ^2.0.10+1
 
+  # IP geolocation for default language detection
+  http: ^1.2.0
+
+  # Cache geo locale + preferences
+  shared_preferences: ^2.2.2
+
+  # Background foreground service (Android)
+  flutter_foreground_task: ^5.0.0
+
+  # Local notifications for reminders
+  flutter_local_notifications: ^17.0.0
+
+  # Timezone support for scheduled notifications
+  timezone: ^0.9.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

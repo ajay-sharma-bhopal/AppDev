@@ -42,6 +42,8 @@ class VoicePanel extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              _WakeWordToggle(voiceService: voiceService),
+              const SizedBox(width: 8),
               _AlwaysListeningToggle(voiceService: voiceService),
             ],
           ),
@@ -61,7 +63,7 @@ class VoicePanel extends StatelessWidget {
             _FeedbackBanner(text: lastFeedback!),
           ],
           const SizedBox(height: 12),
-          _VoiceHints(),
+          _VoiceHints(voiceService: voiceService),
         ],
       ),
     );
@@ -75,6 +77,50 @@ class VoicePanel extends StatelessWidget {
     } else {
       voiceService.startListening();
     }
+  }
+}
+
+class _WakeWordToggle extends StatelessWidget {
+  final VoiceService voiceService;
+  const _WakeWordToggle({required this.voiceService});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: voiceService,
+      builder: (context, _) {
+        final required = voiceService.requireWakeWord;
+        return GestureDetector(
+          onTap: () => voiceService.setRequireWakeWord(!required),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: required
+                  ? const Color(0xFF6C63FF).withOpacity(0.2)
+                  : Colors.white10,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: required
+                    ? const Color(0xFF6C63FF)
+                    : Colors.white24,
+                width: 1,
+              ),
+            ),
+            child: Text(
+              required ? 'Tippidi' : 'Free',
+              style: TextStyle(
+                fontSize: 10,
+                color:
+                    required ? const Color(0xFF6C63FF) : Colors.white38,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -92,14 +138,17 @@ class _AlwaysListeningToggle extends StatelessWidget {
           onTap: () => voiceService.toggleAlwaysListening(),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: isAlways
                   ? AppTheme.listeningColor.withOpacity(0.2)
                   : Colors.white10,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: isAlways ? AppTheme.listeningColor : Colors.white24,
+                color: isAlways
+                    ? AppTheme.listeningColor
+                    : Colors.white24,
                 width: 1,
               ),
             ),
@@ -109,14 +158,18 @@ class _AlwaysListeningToggle extends StatelessWidget {
                 Icon(
                   isAlways ? Icons.hearing : Icons.hearing_disabled,
                   size: 13,
-                  color: isAlways ? AppTheme.listeningColor : Colors.white38,
+                  color: isAlways
+                      ? AppTheme.listeningColor
+                      : Colors.white38,
                 ),
                 const SizedBox(width: 5),
                 Text(
                   isAlways ? 'Always On' : 'Always Off',
                   style: TextStyle(
                     fontSize: 11,
-                    color: isAlways ? AppTheme.listeningColor : Colors.white38,
+                    color: isAlways
+                        ? AppTheme.listeningColor
+                        : Colors.white38,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -251,15 +304,13 @@ class _FeedbackBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.auto_awesome, size: 14, color: AppTheme.primaryColor),
+          const Icon(Icons.auto_awesome,
+              size: 14, color: AppTheme.primaryColor),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ),
         ],
@@ -269,32 +320,43 @@ class _FeedbackBanner extends StatelessWidget {
 }
 
 class _VoiceHints extends StatelessWidget {
+  final VoiceService voiceService;
+  const _VoiceHints({required this.voiceService});
+
   @override
   Widget build(BuildContext context) {
-    final hints = [
-      '"Add buy groceries"',
-      '"Complete meeting"',
-      '"Delete task"',
-    ];
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 4,
-      children: hints.map((hint) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          hint,
-          style: const TextStyle(
-            color: Colors.white38,
-            fontSize: 10,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      )).toList(),
+    return ListenableBuilder(
+      listenable: voiceService,
+      builder: (context, _) {
+        final prefix = voiceService.requireWakeWord ? '"Tippidi ' : '"';
+        final hints = [
+          '${prefix}add buy groceries"',
+          '${prefix}complete meeting"',
+          '${prefix}delete task"',
+        ];
+        return Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: hints
+              .map((hint) => Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      hint,
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 10,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ))
+              .toList(),
+        );
+      },
     );
   }
 }

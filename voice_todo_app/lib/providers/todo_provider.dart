@@ -1,20 +1,29 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../models/todo_item.dart';
+import '../models/pending_add.dart';
 import '../services/command_parser.dart';
 import '../services/voice_service.dart';
+import '../services/reminder_service.dart';
 
 class TodoProvider extends ChangeNotifier {
   final List<TodoItem> _todos = [];
   final CommandParser _parser = CommandParser();
   final VoiceService voiceService = VoiceService();
+  final ReminderService _reminderService = ReminderService();
 
   String _lastCommandFeedback = '';
   bool _isInitialized = false;
   String _filterMode = 'all';
   String? _currentUserId;
   RealtimeChannel? _realtimeChannel;
+
+  // 5-second pending-add state
+  PendingAdd? _pendingAdd;
+  int _pendingSecondsLeft = 0;
+  Timer? _pendingTimer;
 
   List<TodoItem> get todos {
     switch (_filterMode) {
@@ -33,6 +42,8 @@ class TodoProvider extends ChangeNotifier {
   String get lastCommandFeedback => _lastCommandFeedback;
   bool get isInitialized => _isInitialized;
   String get filterMode => _filterMode;
+  PendingAdd? get pendingAdd => _pendingAdd;
+  int get pendingSecondsLeft => _pendingSecondsLeft;
 
   Future<void> initialize() async {
     final userId = supabase.auth.currentUser?.id;
@@ -54,21 +65,25 @@ class TodoProvider extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    _pendingTimer?.cancel();
     _realtimeChannel?.unsubscribe();
     _realtimeChannel = null;
     _currentUserId = null;
     _isInitialized = false;
     _todos.clear();
+    _pendingAdd = null;
     await supabase.auth.signOut();
     notifyListeners();
   }
 
   void reset() {
+    _pendingTimer?.cancel();
     _realtimeChannel?.unsubscribe();
     _realtimeChannel = null;
     _currentUserId = null;
     _isInitialized = false;
     _todos.clear();
+    _pendingAdd = null;
     notifyListeners();
   }
 
@@ -77,15 +92,15 @@ class TodoProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Voice command handling ──────────────────────────────────────────────
+
   Future<void> processVoiceCommand(String text) async {
     final command = _parser.parse(text);
 
     switch (command.type) {
       case CommandType.addTask:
         if (command.taskTitle != null && command.taskTitle!.isNotEmpty) {
-          await _addTask(command.taskTitle!, command.priority ?? Priority.medium);
-          _lastCommandFeedback = 'Added: "${command.taskTitle}"';
-          voiceService.speakTaskAdded(command.taskTitle!);
+          _startPendingAdd(command.taskTitle!, command.priority ?? Priority.medium);
         }
         break;
 
@@ -136,9 +151,74 @@ class TodoProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addTaskManually(String title,
-      {Priority priority = Priority.medium}) async {
-    await _addTask(title, priority);
+  // ── Pending add (5-second delay) ───────────────────────────────────────
+
+  void _startPendingAdd(String title, Priority priority) {
+    _pendingTimer?.cancel();
+    _pendingAdd = PendingAdd(title: title, priority: priority);
+    _pendingSecondsLeft = 5;
+    voiceService.speakPendingAdd(title);
+    notifyListeners();
+
+    _pendingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_pendingSecondsLeft <= 1) {
+        timer.cancel();
+        _confirmPendingAdd();
+      } else {
+        _pendingSecondsLeft--;
+        notifyListeners();
+      }
+    });
+  }
+
+  Future<void> _confirmPendingAdd() async {
+    final pending = _pendingAdd;
+    if (pending == null) return;
+    _pendingAdd = null;
+    _pendingSecondsLeft = 0;
+    notifyListeners();
+
+    await _addTask(
+      pending.title,
+      pending.priority,
+      reminderAt: pending.reminderAt,
+      reminderFrequency: pending.reminderFrequency,
+    );
+    _lastCommandFeedback = 'Added: "${pending.title}"';
+    voiceService.speakTaskAdded(pending.title);
+    notifyListeners();
+  }
+
+  void cancelPendingAdd() {
+    _pendingTimer?.cancel();
+    _pendingAdd = null;
+    _pendingSecondsLeft = 0;
+    _lastCommandFeedback = 'Cancelled';
+    notifyListeners();
+  }
+
+  void confirmPendingAddNow() {
+    _pendingTimer?.cancel();
+    _confirmPendingAdd();
+  }
+
+  void setPendingReminder(String frequency, DateTime? at) {
+    if (_pendingAdd == null) return;
+    _pendingAdd!.reminderFrequency = frequency;
+    _pendingAdd!.reminderAt = at;
+    notifyListeners();
+  }
+
+  // ── Manual CRUD ─────────────────────────────────────────────────────────
+
+  Future<void> addTaskManually(
+    String title, {
+    Priority priority = Priority.medium,
+    DateTime? reminderAt,
+    String reminderFrequency = 'none',
+  }) async {
+    await _addTask(title, priority,
+        reminderAt: reminderAt, reminderFrequency: reminderFrequency);
     _lastCommandFeedback = 'Added: "$title"';
     notifyListeners();
   }
@@ -147,7 +227,6 @@ class TodoProvider extends ChangeNotifier {
     final idx = _todos.indexWhere((t) => t.id == id);
     if (idx == -1) return;
     final newCompleted = !_todos[idx].isCompleted;
-    // Optimistic UI update
     _todos[idx] = _todos[idx].copyWith(
       isCompleted: newCompleted,
       completedAt: newCompleted ? DateTime.now() : null,
@@ -161,6 +240,7 @@ class TodoProvider extends ChangeNotifier {
   }
 
   Future<void> deleteTask(String id) async {
+    await _reminderService.cancelReminder(id);
     await _deleteTask(id);
     notifyListeners();
   }
@@ -175,18 +255,32 @@ class TodoProvider extends ChangeNotifier {
 
   // ── Private helpers ────────────────────────────────────────────────────
 
-  Future<void> _addTask(String title, Priority priority) async {
-    final row = await supabase
-        .from('todos')
-        .insert({
-          'title': title,
-          'priority': priority.name,
-          'is_completed': false,
-          'created_at': DateTime.now().toUtc().toIso8601String(),
-        })
-        .select()
-        .single();
-    _todos.insert(0, TodoItem.fromSupabase(row));
+  Future<void> _addTask(
+    String title,
+    Priority priority, {
+    DateTime? reminderAt,
+    String reminderFrequency = 'none',
+  }) async {
+    final payload = <String, dynamic>{
+      'title': title,
+      'priority': priority.name,
+      'is_completed': false,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'reminder_frequency': reminderFrequency,
+    };
+    if (reminderAt != null) {
+      payload['reminder_at'] = reminderAt.toUtc().toIso8601String();
+    }
+
+    final row = await supabase.from('todos').insert(payload).select().single();
+    final todo = TodoItem.fromSupabase(row);
+    _todos.insert(0, todo);
+
+    if (reminderAt != null && reminderFrequency != 'none') {
+      await _reminderService.scheduleReminder(
+          todo.id, todo.title, reminderAt, reminderFrequency);
+    }
+
     notifyListeners();
   }
 
@@ -210,11 +304,12 @@ class TodoProvider extends ChangeNotifier {
   }
 
   Future<void> _clearCompleted() async {
+    final completedIds = _todos.where((t) => t.isCompleted).map((t) => t.id).toList();
     _todos.removeWhere((t) => t.isCompleted);
-    await supabase
-        .from('todos')
-        .delete()
-        .eq('is_completed', true);
+    for (final id in completedIds) {
+      await _reminderService.cancelReminder(id);
+    }
+    await supabase.from('todos').delete().eq('is_completed', true);
   }
 
   Future<void> _loadTodos() async {
@@ -225,7 +320,8 @@ class TodoProvider extends ChangeNotifier {
           .order('created_at', ascending: false) as List;
       _todos
         ..clear()
-        ..addAll(rows.map((r) => TodoItem.fromSupabase(r as Map<String, dynamic>)));
+        ..addAll(
+            rows.map((r) => TodoItem.fromSupabase(r as Map<String, dynamic>)));
       notifyListeners();
     } catch (e) {
       debugPrint('Failed to load todos: $e');
@@ -263,6 +359,7 @@ class TodoProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _pendingTimer?.cancel();
     _realtimeChannel?.unsubscribe();
     voiceService.dispose();
     super.dispose();
