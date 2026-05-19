@@ -12,10 +12,10 @@ dependencies:
     sdk: flutter
 
   # Voice recognition - supports 50+ languages
-  speech_to_text: ^6.6.0
+  speech_to_text: ^7.0.0
 
   # Text-to-speech feedback
-  flutter_tts: ^4.0.2
+  flutter_tts: ^4.2.0
 
   # State management
   provider: ^6.1.1
