@@ -1,17 +1,16 @@
 // Native implementation (Android/iOS only).
 // Imported via conditional import in main.dart — never imported on web.
-import 'dart:isolate';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 class _TippidiTaskHandler extends TaskHandler {
   @override
-  Future<void> onStart(DateTime timestamp, SendPort? sendPort) async {}
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {}
 
   @override
-  Future<void> onRepeatEvent(DateTime timestamp, SendPort? sendPort) async {}
+  Future<void> onRepeatEvent(DateTime timestamp) async {}
 
   @override
-  Future<void> onDestroy(DateTime timestamp, SendPort? sendPort) async {}
+  Future<void> onDestroy(DateTime timestamp) async {}
 }
 
 @pragma('vm:entry-point')
@@ -19,9 +18,7 @@ void startCallback() {
   FlutterForegroundTask.setTaskHandler(_TippidiTaskHandler());
 }
 
-void initForegroundCommunicationPort() {
-  FlutterForegroundTask.initCommunicationPort();
-}
+void initForegroundCommunicationPort() {}
 
 void initForegroundTask() {
   FlutterForegroundTask.init(
@@ -35,9 +32,8 @@ void initForegroundTask() {
     iosNotificationOptions: const IOSNotificationOptions(
       showNotification: false,
     ),
-    foregroundTaskOptions: const ForegroundTaskOptions(
-      interval: 5000,
-      isOnceEvent: false,
+    foregroundTaskOptions: ForegroundTaskOptions(
+      eventAction: ForegroundTaskEventAction.repeat(5000),
       autoRunOnBoot: false,
       allowWakeLock: true,
       allowWifiLock: false,
@@ -46,8 +42,9 @@ void initForegroundTask() {
 }
 
 Future<void> startForegroundListening() async {
-  if (await FlutterForegroundTask.isRunningService) return;
+  if (FlutterForegroundTask.isRunningService) return;
   await FlutterForegroundTask.startService(
+    serviceId: 256,
     notificationTitle: 'Tippidi is listening',
     notificationText: 'Say "Tippidi" followed by your task',
     callback: startCallback,
