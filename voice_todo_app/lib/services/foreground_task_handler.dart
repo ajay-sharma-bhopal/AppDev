@@ -42,7 +42,7 @@ void initForegroundTask() {
 }
 
 Future<void> startForegroundListening() async {
-  if (FlutterForegroundTask.isRunningService) return;
+  if (await FlutterForegroundTask.isRunningService) return;
   await FlutterForegroundTask.startService(
     serviceId: 256,
     notificationTitle: 'Tippidi is listening',
